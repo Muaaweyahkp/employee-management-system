@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Form - Employee Management System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Create Form Template</h1>
+    <a href="{% url 'form_list' %}" class="btn btn-secondary">Back to List</a>
+</div>
+
+<div class="card">
+    <h2 class="card-header">Form Details</h2>
+    
+    <form id="formBuilder">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            <label for="form_name" class="form-label">Form Name *</label>
+            <input 
+                type="text" 
+                id="form_name" 
+                name="name" 
+                class="form-input" 
+                required
+                placeholder="e.g., Employee Registration Form"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="form_description" class="form-label">Description</label>
+            <textarea 
+                id="form_description" 
+                name="description" 
+                class="form-textarea"
+                placeholder="Brief description of this form"
+            ></textarea>
+        </div>
+
+        <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border-color);">
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3>Form Fields</h3>
+            <button type="button" onclick="addField()" class="btn btn-primary btn-sm">+ Add Field</button>
+        </div>
+
+        <div id="fieldsContainer"></div>
+
+        <button type="submit" class="btn btn-primary mt-3">Create Form</button>
+        <button type="button" onclick="window.location.href='{% url 'form_list' %}'" class="btn btn-secondary mt-3">
+            Cancel
+        </button>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let fieldCounter = 0;
+
+function addField() {
+    fieldCounter++;
+    const container = document.getElementById('fieldsContainer');
+    
+    const fieldDiv = document.createElement('div');
+    fieldDiv.className = 'card';
+    fieldDiv.id = `field_${fieldCounter}`;
+    fieldDiv.style.marginBottom = '1rem';
+    fieldDiv.style.padding = '1.5rem';
+    
+    fieldDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h4 style="margin: 0;">Field #${fieldCounter}</h4>
+            <button type="button" onclick="removeField(${fieldCounter})" class="btn btn-sm btn-danger">Remove</button>
+        </div>
+        
+        <div class="grid grid-2">
+            <div class="form-group">
+                <label class="form-label">Field Label *</label>
+                <input 
+                    type="text" 
+                    class="form-input field-label" 
+                    required
+                    placeholder="e.g., Full Name"
+                >
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Field Type *</label>
+                <select class="form-select field-type" required>
+                    <option value="text">Text</option>
+                    <option value="number">Number</option>
+                    <option value="email">Email</option>
+                    <option value="date">Date</option>
+                    <option value="password">Password</option>
+                    <option value="textarea">Text Area</option>
+                    <option value="tel">Phone Number</option>
+                    <option value="url">URL</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" class="field-required">
+                <span>Required field</span>
+            </label>
+        </div>
+    `;
+    
+    container.appendChild(fieldDiv);
+}
+
+function removeField(id) {
+    const field = document.getElementById(`field_${id}`);
+    if (field) {
+        field.remove();
+    }
+}
+
+document.getElementById('formBuilder').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Collect field data
+    const fields = [];
+    const fieldDivs = document.querySelectorAll('#fieldsContainer > div');
+    
+    fieldDivs.forEach((div, index) => {
+        const label = div.querySelector('.field-label').value;
+        const type = div.querySelector('.field-type').value;
+        const required = div.querySelector('.field-required').checked;
+        
+        // Generate field name from label
+        const name = label.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        
+        fields.push({
+            name: name,
+            label: label,
+            type: type,
+            required: required,
+            order: index
+        });
+    });
+    
+    if (fields.length === 0) {
+        alert('Please add at least one field');
+        return;
+    }
+    
+    // Create form data
+    const formData = new FormData(this);
+    formData.append('fields_config', JSON.stringify(fields));
+    
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating...';
+    
+    fetch('{% url "form_create" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Form created successfully!');
+            window.location.href = '{% url "form_list" %}';
+        } else {
+            alert('Error: ' + data.error);
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while creating form');
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    });
+});
+
+// Add initial field on page load
+window.addEventListener('DOMContentLoaded', function() {
+    addField();
+});
+</script>
+{% endblock %}

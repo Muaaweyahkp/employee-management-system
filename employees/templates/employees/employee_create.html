@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Employee - Employee Management System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Create New Employee</h1>
+    <a href="{% url 'employee_list' %}" class="btn btn-secondary">Back to List</a>
+</div>
+
+<div class="card">
+    <h2 class="card-header">Employee Information</h2>
+    
+    <form id="employeeForm">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            <label for="form_select" class="form-label">Select Form Template *</label>
+            <select id="form_select" name="form_id" class="form-select" required>
+                <option value="">-- Choose a form --</option>
+                {% for form in forms %}
+                <option value="{{ form.id }}">{{ form.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div id="dynamicFields"></div>
+
+        <div id="submitSection" style="display: none;">
+            <button type="submit" class="btn btn-primary">Create Employee</button>
+            <button type="button" onclick="window.location.href='{% url 'employee_list' %}'" class="btn btn-secondary">
+                Cancel
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('form_select').addEventListener('change', function() {
+    const formId = this.value;
+    const dynamicFields = document.getElementById('dynamicFields');
+    const submitSection = document.getElementById('submitSection');
+    
+    if (!formId) {
+        dynamicFields.innerHTML = '';
+        submitSection.style.display = 'none';
+        return;
+    }
+    
+    // Show loading
+    dynamicFields.innerHTML = '<div class="spinner"></div>';
+    
+    // Fetch form fields
+    fetch(`/employees/api/form-fields/${formId}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let html = '<h3 style="margin: 2rem 0 1rem;">Form Fields</h3>';
+                
+                data.fields.forEach(field => {
+                    html += `
+                        <div class="form-group">
+                            <label for="field_${field.name}" class="form-label">
+                                ${field.label}
+                                ${field.required ? '*' : ''}
+                            </label>
+                    `;
+                    
+                    if (field.type === 'textarea') {
+                        html += `
+                            <textarea 
+                                id="field_${field.name}" 
+                                name="${field.name}" 
+                                class="form-textarea"
+                                ${field.required ? 'required' : ''}
+                            ></textarea>
+                        `;
+                    } else {
+                        html += `
+                            <input 
+                                type="${field.type}" 
+                                id="field_${field.name}" 
+                                name="${field.name}" 
+                                class="form-input"
+                                ${field.required ? 'required' : ''}
+                            >
+                        `;
+                    }
+                    
+                    html += '</div>';
+                });
+                
+                dynamicFields.innerHTML = html;
+                submitSection.style.display = 'block';
+            } else {
+                dynamicFields.innerHTML = `<p style="color: var(--danger-color);">Error: ${data.error}</p>`;
+                submitSection.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            dynamicFields.innerHTML = '<p style="color: var(--danger-color);">Failed to load form fields</p>';
+            submitSection.style.display = 'none';
+        });
+});
+
+document.getElementById('employeeForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating...';
+    
+    fetch('{% url "employee_create" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Employee created successfully!');
+            window.location.href = '{% url "employee_list" %}';
+        } else {
+            alert('Error: ' + data.error);
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while creating employee');
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    });
+});
+</script>
+{% endblock %}

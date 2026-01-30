@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block title %}Employees - Employee Management System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Employee Management</h1>
+    <a href="{% url 'employee_create' %}" class="btn btn-primary">Add New Employee</a>
+</div>
+
+<div class="card">
+    <form method="GET" class="search-bar">
+        <input 
+            type="text" 
+            name="search" 
+            placeholder="Search employees..." 
+            class="form-input search-input"
+            value="{{ search_query }}"
+        >
+        <select name="form" class="form-select">
+            <option value="">All Forms</option>
+            {% for form in forms %}
+            <option value="{{ form.id }}" {% if form_filter == form.id|stringformat:"s" %}selected{% endif %}>
+                {{ form.name }}
+            </option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">Search</button>
+    </form>
+
+    <div class="table-container">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Form Type</th>
+                    <th>Employee Name</th>
+                    <th>Created By</th>
+                    <th>Created At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for employee in employees %}
+                <tr>
+                    <td>{{ employee.id }}</td>
+                    <td><span class="badge badge-primary">{{ employee.form.name }}</span></td>
+                    <td>{{ employee.get_display_name }}</td>
+                    <td>{{ employee.created_by.username }}</td>
+                    <td>{{ employee.created_at|date:"M d, Y H:i" }}</td>
+                    <td>
+                        <a href="{% url 'employee_edit' employee.id %}" class="btn btn-sm btn-secondary">Edit</a>
+                        <button 
+                            onclick="deleteEmployee({{ employee.id }})" 
+                            class="btn btn-sm btn-danger"
+                        >Delete</button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 2rem;">
+                        No employees found. <a href="{% url 'employee_create' %}">Create one now</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function deleteEmployee(id) {
+    if (confirm('Are you sure you want to delete this employee?')) {
+        fetch(`/employees/delete/${id}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred');
+        });
+    }
+}
+</script>
+{% endblock %}
